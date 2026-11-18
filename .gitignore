@@ -1,0 +1,14 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Local database (each machine creates its own)
+*.db
+
+# Node / frontend (for later)
+node_modules/
+dist/
+
+# Environment secrets
+.env
