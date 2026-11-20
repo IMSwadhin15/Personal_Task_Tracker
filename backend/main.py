@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from database import get_connection, init_db
@@ -13,6 +13,12 @@ class TaskCreate(BaseModel):
     """The JSON body the client must send when creating a task."""
 
     title: str = Field(min_length=1, max_length=200)
+
+
+class TaskUpdate(BaseModel):
+    """The JSON body the client sends to mark a task complete or active."""
+
+    completed: bool
 
 
 def row_to_task(row) -> dict:
@@ -45,3 +51,25 @@ def create_task(task: TaskCreate):
         new_id = cursor.lastrowid
         row = conn.execute("SELECT * FROM tasks WHERE id = ?", (new_id,)).fetchone()
     return row_to_task(row)
+
+
+@app.patch("/tasks/{task_id}")
+def update_task(task_id: int, update: TaskUpdate):
+    with get_connection() as conn:
+        cursor = conn.execute(
+            "UPDATE tasks SET completed = ? WHERE id = ?",
+            (int(update.completed), task_id),
+        )
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Task not found")
+        row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    return row_to_task(row)
+
+
+@app.delete("/tasks/{task_id}", status_code=204)
+def delete_task(task_id: int):
+    with get_connection() as conn:
+        cursor = conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Task not found")
+    return Response(status_code=204)
