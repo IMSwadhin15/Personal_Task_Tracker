@@ -1,16 +1,23 @@
+import os
+
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from database import get_connection, init_db
+from database import fetch_all, fetch_one, init_db
 
 app = FastAPI(title="Task Tracker API")
 
 # CORS: browsers block a page from calling an API on a different address
-# unless the API says it's allowed. This lets the Vite dev server call us.
+# unless the API says it's allowed. The Vite dev server is always allowed;
+# on Render, FRONTEND_URL adds the deployed frontend's address.
+allowed_origins = ["http://localhost:5173"]
+if os.environ.get("FRONTEND_URL"):
+    allowed_origins.append(os.environ["FRONTEND_URL"].rstrip("/"))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=allowed_origins,
     allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["Content-Type"],
 )
@@ -31,12 +38,12 @@ class TaskUpdate(BaseModel):
     completed: bool
 
 
-def row_to_task(row) -> dict:
+def row_to_task(row: dict) -> dict:
     """Turn a database row into the JSON shape the frontend will receive."""
     return {
         "id": row["id"],
         "title": row["title"],
-        "completed": bool(row["completed"]),  # 0/1 in SQLite -> false/true in JSON
+        "completed": bool(row["completed"]),  # SQLite stores 0/1 -> false/true
     }
 
 
@@ -47,39 +54,32 @@ def health():
 
 @app.get("/tasks")
 def list_tasks():
-    with get_connection() as conn:
-        rows = conn.execute("SELECT * FROM tasks ORDER BY id").fetchall()
+    rows = fetch_all("SELECT * FROM tasks ORDER BY id")
     return [row_to_task(r) for r in rows]
 
 
+# "RETURNING *" makes the database hand back the row it just wrote, so we
+# don't need a second query. Both SQLite and Postgres support it.
 @app.post("/tasks", status_code=201)
 def create_task(task: TaskCreate):
-    with get_connection() as conn:
-        cursor = conn.execute(
-            "INSERT INTO tasks (title) VALUES (?)", (task.title,)
-        )
-        new_id = cursor.lastrowid
-        row = conn.execute("SELECT * FROM tasks WHERE id = ?", (new_id,)).fetchone()
+    row = fetch_one("INSERT INTO tasks (title) VALUES (?) RETURNING *", (task.title,))
     return row_to_task(row)
 
 
 @app.patch("/tasks/{task_id}")
 def update_task(task_id: int, update: TaskUpdate):
-    with get_connection() as conn:
-        cursor = conn.execute(
-            "UPDATE tasks SET completed = ? WHERE id = ?",
-            (int(update.completed), task_id),
-        )
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Task not found")
-        row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    row = fetch_one(
+        "UPDATE tasks SET completed = ? WHERE id = ? RETURNING *",
+        (update.completed, task_id),
+    )
+    if row is None:  # no row matched that id
+        raise HTTPException(status_code=404, detail="Task not found")
     return row_to_task(row)
 
 
 @app.delete("/tasks/{task_id}", status_code=204)
 def delete_task(task_id: int):
-    with get_connection() as conn:
-        cursor = conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Task not found")
+    row = fetch_one("DELETE FROM tasks WHERE id = ? RETURNING id", (task_id,))
+    if row is None:
+        raise HTTPException(status_code=404, detail="Task not found")
     return Response(status_code=204)

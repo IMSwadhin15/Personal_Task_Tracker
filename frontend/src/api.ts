@@ -10,7 +10,8 @@ export type Task = {
 
 // In development the backend runs on port 8000. When deployed, set
 // VITE_API_URL to the backend's public address at build time.
-const API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+// (A trailing "/" is removed so "https://x.com/" + "/tasks" doesn't become "//tasks".)
+const API_URL: string = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000').replace(/\/$/, '')
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   let response: Response

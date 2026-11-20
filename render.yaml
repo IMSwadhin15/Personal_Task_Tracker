@@ -1,0 +1,35 @@
+# Render "Blueprint": tells Render how to build and run both parts of the app.
+# Render reads this file when you choose New > Blueprint and pick this repo.
+# Values marked "sync: false" are secrets/addresses you type in Render's
+# dashboard; they are never stored in git.
+
+services:
+  # Backend: FastAPI, runs all the time (sleeps after 15 min idle on free plan)
+  - type: web
+    name: task-tracker-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.4
+      - key: DATABASE_URL # Neon connection string (secret)
+        sync: false
+      - key: FRONTEND_URL # e.g. https://task-tracker-web.onrender.com
+        sync: false
+
+  # Frontend: React, built once into plain files and served for free
+  - type: web
+    name: task-tracker-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: VITE_API_URL # e.g. https://task-tracker-api.onrender.com
+        sync: false
