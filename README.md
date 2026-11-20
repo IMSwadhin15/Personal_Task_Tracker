@@ -2,6 +2,13 @@
 
 A small to-do app: add tasks, mark them complete, delete them.
 
+**Live app:** <https://task-tracker-web-0kcx.onrender.com>
+(API: <https://task-tracker-api-v4c3.onrender.com>, docs at
+[`/docs`](https://task-tracker-api-v4c3.onrender.com/docs))
+
+> The free backend sleeps after 15 minutes without visits, so the first load
+> can take up to a minute.
+
 - **Backend:** FastAPI (Python 3.11), in [`backend/`](backend)
 - **Frontend:** React + TypeScript + Vite, in [`frontend/`](frontend)
 - **Database:** SQLite on your computer, PostgreSQL ([Neon](https://neon.com)) when deployed
