@@ -1,9 +1,19 @@
 from fastapi import FastAPI, HTTPException, Response
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from database import get_connection, init_db
 
 app = FastAPI(title="Task Tracker API")
+
+# CORS: browsers block a page from calling an API on a different address
+# unless the API says it's allowed. This lets the Vite dev server call us.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
+    allow_headers=["Content-Type"],
+)
 
 # Make sure the tasks table exists when the server starts.
 init_db()
